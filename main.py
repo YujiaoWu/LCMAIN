@@ -99,8 +99,10 @@ def segmentation(input_dict,img,i,output):
         plt.imshow(img2)
         plt.title('This is the leision seperate0', color='blue')
         plt.show()
-        
-        cv2.imwrite(f'{output}/{i[:-3]}png', img2)
+
+        img3 = npy_to_png(img2)
+
+        cv2.imwrite(f'{output}/{i[:-3]}png', img3)
         img_t = mpimg.imread(f'{output}/{i[:-3]}png')
         plt.imshow(img_t)
         plt.title('This is the leision seperate1', color='blue')
