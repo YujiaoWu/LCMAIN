@@ -15,14 +15,14 @@ from shutil import copy2
 
 
 
-def move_and_process_dcm_data(source,destination='./dcm_data'):
+def move_and_process_dcm_data(source,output='/home/yujwu/Data/NLST/survivalestimate/data/output_nodule',destination='./dcm_data'):
     files = os.listdir(source)
     for i in files:
         copy2(f"{source}/{i}", destination)
         image,image_raw,info_dict,img = Load_preprocess_raw_data(destination)
         lesion_np_path, lung_np_path = process_lung_part(info_dict,image_raw)
         input_dict = {"image_np_path": [[lesion_np_path, lung_np_path]]}
-        segmentation(input_dict,img)
+        segmentation(input_dict,img,i,output)
         os.remove(f"./dcm_data/{i}")
 
 
@@ -57,7 +57,7 @@ def process_lung_part(info_dict,image_raw):
 
     return lesion_np_path, lung_np_path
 
-def segmentation(input_dict,img):
+def segmentation(input_dict,img,i,output):
     import paddlehub as hub
     pneumonia = hub.Module(name="Pneumonia_CT_LKM_PP")
     results = pneumonia.segmentation(data=input_dict)
@@ -96,9 +96,10 @@ def segmentation(input_dict,img):
         size_test = len(indx[0])
         # img2=np.reshape(img2,[int(size_test/1),1,3])
         img2 = np.reshape(img2, [len(index_x), len(index_y), 3])
-        plt.imshow(img2)
-        plt.title('This is the leision seperate', color='blue')
-        plt.show()
+        cv2.imwrite(f'{output}/{i}', img2)
+        # plt.imshow(img2)
+        # plt.title('This is the leision seperate', color='blue')
+        # plt.show()
     else:
         print("no leision")
 
