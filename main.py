@@ -11,19 +11,19 @@ import cv2
 import copy
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-import shutil
+from shutil import copyfile
 
 
 
 def move_and_process_dcm_data(source,destination='./dcm_data'):
     files = os.listdir(source)
-    for f in files:
-        new_path = shutil.move(f"{source}/{f}", destination)
+    for i in files:
+        copyfile(f"{source}/{i}", destination)
         image,image_raw,info_dict,img = Load_preprocess_raw_data(destination)
         lesion_np_path, lung_np_path = process_lung_part(info_dict,image_raw)
         input_dict = {"image_np_path": [[lesion_np_path, lung_np_path]]}
         segmentation(input_dict,img)
-        os.remove(f"./dcm_data/{f}")
+        os.remove(f"./dcm_data/{i}")
 
 
 def Load_preprocess_raw_data(filepath='./dcm_data'):
