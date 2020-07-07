@@ -9,105 +9,101 @@ from lib.png_rw import npy_to_png
 from lib.judge_mkdir import judge_mkdir
 import cv2
 import copy
-
-
-# image_raw, info_dict = load_input_data('./dcm_data')
-image_raw, info_dict = load_input_data('./dcm_data')
-# 1. 展示医学图像
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
-
-#save_image = copy.deepcopy(image_raw)
-image = windowlize_image(image_raw, 1500, -500)[0]
-image = npy_to_png(image)
-image = (image - float(np.min(image))) / float(np.max(image)) * 255.
-
-image = image[np.newaxis, :, :]
-image = image.transpose((1, 2, 0)).astype('float32')
-image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
-image_temp = image
-
-cv2.imwrite('demo.png', image)
-img = mpimg.imread('demo.png')
-plt.figure(figsize=(10,10))
-plt.imshow(img)
-plt.axis('off')
-plt.title('This is img', color='blue')
-plt.show()
-
-# 2. 进行肺部分割需要的前处理
-lung_part, info_dict = preprocess_lung_part(image_raw, info_dict)
-# 3. 进行病灶分割需要的前处理
-ww, wc = (1500, -500)
-lesion_part = windowlize_image(image_raw.copy(), ww, wc)
-lesion_part = np.squeeze(lesion_part, 0)
-lesion_np_path = "lesion_part.npy"
-lung_np_path = "lung_part.npy"
-np.save(lung_np_path, lung_part)
-np.save(lesion_np_path, lesion_part)
-print('肺部分割输入：', lung_part.shape)
-print('病灶分割输入：', lesion_part.shape)
-
-input_dict = {"image_np_path": [[lesion_np_path, lung_np_path]] }
-import paddlehub as hub
-pneumonia = hub.Module(name="Pneumonia_CT_LKM_PP")
-results = pneumonia.segmentation(data=input_dict)
-
-# 输出结果包含input_lesion_np_path与output_lesion_np
-print(results[0])
-
-lesion_part = results[0]['output_lesion_np'].astype(np.uint8)
-plt.title('This is the leision part 0000',color='red')
-plt.imshow(lesion_part)
-plt.axis('off')
-plt.show()
-
-# exit(0)
-lesion_mask=results[0]['output_lesion_np'].astype(np.uint8)
-mask_row = 30
-mask_col = 30
-#create a new image for storing the image data in the mask region
-image_new = np.zeros([512,512,3]).astype(np.float32)
-# get the index of mask non-zero
-indx = np.nonzero(lesion_mask)
-# crop the image by using the mask index
-# xindex = np.nonzero(lesion_mask[0])
-# yindex = np.nonzero(lesion_mask[1])
-xindex = len(indx[0])
-yindex = len(indx[1])
-
-if xindex != 0:
-    xindex_min = min(indx[0])
-    xindex_max = max(indx[0])
-
-    yindex_min = min(indx[1])
-    yindex_max = max(indx[1])
-
-    index_x = [i for i in range(xindex_min,xindex_max)]
-    index_y = [i for i in range(yindex_min,yindex_max)]
-
-    x_i = []
-    y_i = []
-
-    for x in index_x:
-        for y in index_y:
-            y_i.append(y)
-            x_i.append(x)
-
-    img2 = img[x_i, y_i, :]
-
-    size_test = len(indx[0])
-    # img2=np.reshape(img2,[int(size_test/1),1,3])
-    img2 = np.reshape(img2, [len(index_x), len(index_y), 3])
-
-    plt.imshow(img2)
-    plt.title('This is the leision seperate', color='blue')
-    plt.show()
-else:
-    print("no leision")
+import shutil
 
 
 
+def move_and_process_dcm_data(source,destination='./dcm_data'):
+    files = os.listdir(source)
+    for f in files:
+        new_path = shutil.move(f"{source}/{f}", destination)
+        image,image_raw,info_dict = Load_preprocess_raw_data(destination)
+        lesion_np_path, lung_np_path = process_lung_part(info_dict,image_raw)
+        input_dict = {"image_np_path": [[lesion_np_path, lung_np_path]] }
+        segmentation(input_dict)
+        os.remove(f"./dcm_data/{f}")
+
+
+def Load_preprocess_raw_data(filepath='./dcm_data'):
+    # image_raw, info_dict = load_input_data('./dcm_data')
+    image_raw, info_dict = load_input_data(filepath)
+    # 1. 展示医学图像
+    image = windowlize_image(image_raw, 1500, -500)[0]
+    image = npy_to_png(image)
+    image = (image - float(np.min(image))) / float(np.max(image)) * 255.
+
+    image = image[np.newaxis, :, :]
+    image = image.transpose((1, 2, 0)).astype('float32')
+    image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+
+    return image,image_raw,info_dict
+
+
+def process_lung_part(info_dict,image_raw):
+    # 2. 进行肺部分割需要的前处理
+    lung_part, info_dict = preprocess_lung_part(image_raw, info_dict)
+    # 3. 进行病灶分割需要的前处理
+    ww, wc = (1500, -500)
+    lesion_part = windowlize_image(image_raw.copy(), ww, wc)
+    lesion_part = np.squeeze(lesion_part, 0)
+    lesion_np_path = "lesion_part.npy"
+    lung_np_path = "lung_part.npy"
+    np.save(lung_np_path, lung_part)
+    np.save(lesion_np_path, lesion_part)
+
+    return lesion_np_path, lung_np_path
+
+def segmentation(input_dict):
+    import paddlehub as hub
+    pneumonia = hub.Module(name="Pneumonia_CT_LKM_PP")
+    results = pneumonia.segmentation(data=input_dict)
+
+    lesion_part = results[0]['output_lesion_np'].astype(np.uint8)
+    lesion_mask=results[0]['output_lesion_np'].astype(np.uint8)
+    mask_row = 30
+    mask_col = 30
+    #create a new image for storing the image data in the mask region
+    image_new = np.zeros([512,512,3]).astype(np.float32)
+    # get the index of mask non-zero
+    indx = np.nonzero(lesion_mask)
+    xindex = len(indx[0])
+    yindex = len(indx[1])
+
+    if xindex != 0:
+        xindex_min = min(indx[0])
+        xindex_max = max(indx[0])
+
+        yindex_min = min(indx[1])
+        yindex_max = max(indx[1])
+
+        index_x = [i for i in range(xindex_min,xindex_max)]
+        index_y = [i for i in range(yindex_min,yindex_max)]
+
+        x_i = []
+        y_i = []
+
+        for x in index_x:
+            for y in index_y:
+                y_i.append(y)
+                x_i.append(x)
+
+        img2 = img[x_i, y_i, :]
+
+        size_test = len(indx[0])
+        # img2=np.reshape(img2,[int(size_test/1),1,3])
+        img2 = np.reshape(img2, [len(index_x), len(index_y), 3])
+        plt.imshow(img2)
+        plt.title('This is the leision seperate', color='blue')
+        plt.show()
+    else:
+        print("no leision")
+
+
+move_and_process_dcm_data("/home/yujwu/Data/NLST/preprocessing/Pneumonia-CT-LKM-PP/aistudio/more_data")
+
+exit(0)
 # # image_new[indx[0],indx[1],:] = img[index_x,index_y,:]
 # image_new[indx[0],indx[1],:] = img[indx[0],indx[1],:]
 #
@@ -124,6 +120,10 @@ else:
 # plt.imshow(img2)
 # plt.title('This is the leision kouchulaide',color='blue')
 # plt.show()
+
+
+
+
 
 from PIL import Image as PILImage
 from mate.postprocess_lung_part import postprocess_lung_part
@@ -170,14 +170,6 @@ plt.show()
 
 # 对肺部分割结果和病灶分割结果进行后处理
 lung_part, lesion_part = merge_process(image_raw, lung_part, lesion_part)
-
-# pred_lesion = PILImage.fromarray(np.argmax(lesion_part, -1)[0].astype(np.uint8), mode='P')
-# pred_lesion = pred_lesion.convert('RGB')
-#
-# plt.title('This is the pred_lesion',color='blue')
-# plt.imshow(pred_lesion)
-# plt.axis('off')
-# plt.show()
 
 
 test = np.argmax(lung_part, -1)[0].astype(np.uint8)
