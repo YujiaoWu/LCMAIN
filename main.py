@@ -96,12 +96,11 @@ def segmentation(input_dict,img,i,output):
         size_test = len(indx[0])
         # img2=np.reshape(img2,[int(size_test/1),1,3])
         img2 = np.reshape(img2, [len(index_x), len(index_y), 3])
-        plt.imshow(img2)
-        plt.title('This is the leision seperate0', color='blue')
-        plt.show()
+        # plt.imshow(img2)
+        # plt.title('This is the leision seperate0', color='blue')
+        # plt.show()
 
         # img3 = npy_to_png(img2)
-
         plt.imsave(f'{output}/{i[:-3]}png',img2)
         # img_t = mpimg.imread(f'{output}/{i[:-3]}png')
         # plt.imshow(img_t)
