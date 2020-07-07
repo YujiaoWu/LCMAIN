@@ -19,10 +19,10 @@ def move_and_process_dcm_data(source,destination='./dcm_data'):
     files = os.listdir(source)
     for f in files:
         new_path = shutil.move(f"{source}/{f}", destination)
-        image,image_raw,info_dict = Load_preprocess_raw_data(destination)
+        image,image_raw,info_dict,img = Load_preprocess_raw_data(destination)
         lesion_np_path, lung_np_path = process_lung_part(info_dict,image_raw)
-        input_dict = {"image_np_path": [[lesion_np_path, lung_np_path]] }
-        segmentation(input_dict)
+        input_dict = {"image_np_path": [[lesion_np_path, lung_np_path]]}
+        segmentation(input_dict,img)
         os.remove(f"./dcm_data/{f}")
 
 
@@ -37,8 +37,10 @@ def Load_preprocess_raw_data(filepath='./dcm_data'):
     image = image[np.newaxis, :, :]
     image = image.transpose((1, 2, 0)).astype('float32')
     image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+    cv2.imwrite('demo.png', image)
+    img = mpimg.imread('demo.png')
 
-    return image,image_raw,info_dict
+    return image,image_raw,info_dict,img
 
 
 def process_lung_part(info_dict,image_raw):
@@ -55,7 +57,7 @@ def process_lung_part(info_dict,image_raw):
 
     return lesion_np_path, lung_np_path
 
-def segmentation(input_dict):
+def segmentation(input_dict,img):
     import paddlehub as hub
     pneumonia = hub.Module(name="Pneumonia_CT_LKM_PP")
     results = pneumonia.segmentation(data=input_dict)
